@@ -41,7 +41,7 @@ class QwenGRPOTrainer(GRPOTrainer):
         # In GRPOTrainer, we preprocess data, so using the model's signature columns doesn't work.
         # Instead, we set them to the columns expected by the `training_step` method, hence the override.
         if self._signature_columns is None:
-            self._signature_columns = ["prompt", "image", "images", "video", "videos", "video_kwargs"]
+            self._signature_columns = ["prompt", "assistant", "image", "images", "video", "videos", "video_kwargs"]
 
     def _generate_and_score_completions(
         self, inputs: list[dict[str, torch.Tensor | Any]]
@@ -107,6 +107,8 @@ class QwenGRPOTrainer(GRPOTrainer):
 
         num_images = [len(img_list) for img_list in images] if images is not None else None
 
+        model_id = getattr(self.model.config, "_name_or_path", "")
+
         # Get forward_kwargs for models with multimodal inputs
         if images is not None or videos is not None:
             prompts_text = prompts
@@ -115,12 +117,38 @@ class QwenGRPOTrainer(GRPOTrainer):
                 text=prompts_text,
                 padding=True,
                 return_tensors="pt",
+                do_resize=False
             )
             if images is not None:
                 processor_kwargs["images"] = images
             if videos is not None:
+                if "Qwen2.5" in model_id:
+                    common_vk = video_kwargs[0] if isinstance(video_kwargs, list) else video_kwargs
+                    processor_kwargs["videos"] = videos
+                    if common_vk is not None:
+                        processor_kwargs.update(common_vk)
+
+            elif "Qwen3" in model_id:
+                batched_video_datas = []
+                batched_video_metadatas = []
+                for sample_videos in videos:
+                    if sample_videos is None:
+                        batched_video_datas.append(None)
+                        batched_video_metadatas.append(None)
+                    else:
+                        datas, metas = zip(*sample_videos)
+                        batched_video_datas.append(list(datas))
+                        batched_video_metadatas.append(list(metas))
+
+                processor_kwargs["videos"] = batched_video_datas
+                processor_kwargs["video_metadata"] = batched_video_metadatas
+                
+                common_vk = video_kwargs[0] if isinstance(video_kwargs, list) else video_kwargs
+                if common_vk is not None:
+                    processor_kwargs.update(common_vk)
+
+            else:
                 processor_kwargs["videos"] = videos
-                processor_kwargs["video_kwargs"] = video_kwargs
 
             prompt_inputs = self.processing_class(**processor_kwargs)
             prompt_inputs = super()._prepare_inputs(prompt_inputs)
@@ -330,8 +358,8 @@ class QwenGRPOTrainer(GRPOTrainer):
             output["pixel_values_videos"] = forward_kwargs["pixel_values_videos"]
         if "video_grid_thw" in forward_kwargs:
             output["video_grid_thw"] = forward_kwargs["video_grid_thw"]
-        if "second_grid_ts" in forward_kwargs:
-            output["second_grid_ts"] = forward_kwargs["second_grid_ts"]
+        if "second_per_grid_ts" in forward_kwargs:
+            output["second_per_grid_ts"] = forward_kwargs["second_per_grid_ts"]
 
         if "token_type_ids" in forward_kwargs:
             output["token_type_ids"] = forward_kwargs["token_type_ids"]
@@ -356,7 +384,7 @@ class QwenGRPOTrainer(GRPOTrainer):
         token_type_ids=None,
         pixel_values_videos=None,
         video_grid_thw=None,
-        second_grid_ts=None,
+        second_per_grid_ts=None,
     ) -> dict[str, torch.Tensor | None]:
         """Compute log-probs and (optionally) entropies for each token."""
         batch_size = batch_size or input_ids.size(0)  # Chunk inputs into smaller batches to reduce memory peak
@@ -385,8 +413,8 @@ class QwenGRPOTrainer(GRPOTrainer):
                 model_inputs["pixel_values_videos"] = pixel_values_videos[start : start + batch_size]
             if video_grid_thw is not None:
                 model_inputs["video_grid_thw"] = video_grid_thw[start : start + batch_size]
-            if second_grid_ts is not None:
-                model_inputs["second_grid_ts"] = second_grid_ts[start : start + batch_size]
+            if second_per_grid_ts is not None:
+                model_inputs["second_per_grid_ts"] = second_per_grid_ts[start : start + batch_size]
 
             if pixel_attention_mask is not None:
                 model_inputs["pixel_attention_mask"] = pixel_attention_mask[start : start + batch_size]
@@ -436,7 +464,7 @@ class QwenGRPOTrainer(GRPOTrainer):
         image_sizes=None,
         pixel_values_videos=None,
         video_grid_thw=None,
-        second_grid_ts=None,
+        second_per_grid_ts=None,
     ):
         if is_peft_model(unwrapped_model):
             unwrapped_model = unwrapped_model.base_model.model
@@ -454,8 +482,8 @@ class QwenGRPOTrainer(GRPOTrainer):
         if video_grid_thw is not None and pixel_values_videos is not None:
             model_inputs["video_grid_thw"] = video_grid_thw
             model_inputs["pixel_values_videos"] = pixel_values_videos
-        if second_grid_ts is not None:
-            model_inputs["second_grid_ts"] = second_grid_ts
+        if second_per_grid_ts is not None:
+            model_inputs["second_per_grid_ts"] = second_per_grid_ts
 
         # For SmolVLM2
         if pixel_attention_mask is not None:
@@ -498,7 +526,7 @@ class QwenGRPOTrainer(GRPOTrainer):
             inputs.get("image_sizes"),
             inputs.get("pixel_values_videos"),
             inputs.get("video_grid_thw"),
-            inputs.get("second_grid_ts"),
+            inputs.get("second_per_grid_ts"),
         )
 
         # compute loss and metrics using liger grpo loss
@@ -547,7 +575,7 @@ class QwenGRPOTrainer(GRPOTrainer):
             token_type_ids=inputs.get("token_type_ids"),
             pixel_values_videos=inputs.get("pixel_values_videos"),
             video_grid_thw=inputs.get("video_grid_thw"),
-            second_grid_ts=inputs.get("second_grid_ts"),
+            second_per_grid_ts=inputs.get("second_per_grid_ts"),
         )
 
         if self.top_entropy_quantile < 1.0:
