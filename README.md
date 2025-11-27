@@ -261,7 +261,7 @@ The script requires a dataset formatted according to the LLaVA specification. Th
     "conversations": [
       {
         "from": "human",
-        "value": "Based on the image, which geometric method is used to determine the bearing angle, and why is it the most appropriate choice?"
+        "value": "<image>\nBased on the image, which geometric method is used to determine the bearing angle, and why is it the most appropriate choice?"
       },
       {
         "from": "gpt",
@@ -272,8 +272,6 @@ The script requires a dataset formatted according to the LLaVA specification. Th
   ...
 ]
 ```
-
-**Note:** You should remove all `<image>` and `<video>` tokens in your dataset. It works a bit different with other training methods.
 
 </details>
 

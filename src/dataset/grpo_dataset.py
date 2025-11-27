@@ -134,6 +134,8 @@ class GRPODataset(Dataset):
             prompt=user_prompt,
             assistant=assistant_prompt,
             images=images,
+            videos=videos,
+            video_kwargs=video_kwargs if is_video else None,
         )
 
         return data_dict
