@@ -278,6 +278,8 @@ Adding the new domain-specific data on top of the general data from open-source 
 
 ## Supervised Fine Tuning
 
+⚠️**For Qwen3-VL models, using liger-kernel with full fine-tuning is awfully slow. I recommend turning off liger-kernel or use zero2 with full-finetuning.**<br><br>
+
 **Note:** Deepspeed zero2 is faster than zero3, however it consumes more memory. Also, most of the time zero2 is more stable than zero3.<br><br>
 **Tip:** You could use `adamw_bnb_8bit` for optimizer to save memory.
 
