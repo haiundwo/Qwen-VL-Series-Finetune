@@ -55,6 +55,7 @@ and [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-4B-Thinking) with only using
     - [Train with video dataset](#train-with-video-dataset)
       - [Image Resolution for vram usage](#image-resolution-for-vram-usage)
       - [Merge LoRA Weights](#merge-lora-weights)
+    - [Evaluation during Training](#evaluation-during-training)
   - [DPO Finetuning](#dpo-finetuning)
   - [GRPO Finetuning](#grpo-finetuning)
     - [Prerequisites](#prerequisites)
@@ -409,6 +410,144 @@ bash scripts/merge_lora.sh
 ```
 
 **Note:** Remember to replace the paths in `finetune.sh` or `finetune_lora.sh` with your specific paths. (Also in `merge_lora.sh` when using LoRA.)
+
+### Evaluation during Training
+
+You can run generation-based evaluation during training by providing an evaluation dataset and a custom `compute_metrics` function. This allows you to monitor metrics like accuracy, BLEU, or any custom metric based on the model's generated text outputs.
+
+#### Step 1: Prepare Evaluation Dataset
+
+The evaluation dataset uses the same format as the training dataset. Place your evaluation data JSON file and specify the path using `--eval_path`.
+
+```json
+[
+  {
+    "id": "eval_001",
+    "image": "test_image.jpg",
+    "conversations": [
+      {
+        "from": "human",
+        "value": "<image>\nWhat is shown in this image?"
+      },
+      {
+        "from": "gpt",
+        "value": "A cat sitting on a couch."
+      }
+    ]
+  }
+]
+```
+
+#### Step 2: Define compute_metrics Function
+
+Create a custom `compute_metrics` function in your training script. The function receives a `GenerativeEvalPrediction` object containing:
+- `predictions`: List of generated text strings from the model
+- `references`: List of ground truth answer strings
+
+```python
+from src.trainer import GenerativeEvalPrediction
+
+def compute_metrics(eval_pred: GenerativeEvalPrediction):
+    predictions = eval_pred.predictions
+    references = eval_pred.references
+
+    # Example: Exact match accuracy
+    correct = sum(
+        1 for p, r in zip(predictions, references)
+        if p.strip().lower() == r.strip().lower()
+    )
+    accuracy = correct / len(predictions) if predictions else 0
+
+    return {"accuracy": accuracy}
+```
+
+#### Step 3: Modify Training Script
+
+Update your training script (`src/train/train_sft.py`) to pass `compute_metrics` to the trainer:
+
+```python
+from src.trainer import QwenSFTTrainer, GenerativeEvalPrediction
+
+def compute_metrics(eval_pred: GenerativeEvalPrediction):
+    predictions = eval_pred.predictions
+    references = eval_pred.references
+    correct = sum(1 for p, r in zip(predictions, references) if p.strip() == r.strip())
+    return {"accuracy": correct / len(predictions)}
+
+# ... (model and data setup code)
+
+trainer = QwenSFTTrainer(
+    model=model,
+    processing_class=processor,
+    args=training_args,
+    compute_metrics=compute_metrics,  # Add this line
+    **data_module
+)
+```
+
+#### Step 4: Add Evaluation Arguments
+
+Add these arguments to your training script:
+
+```bash
+python -m src.train.train_sft \
+    --model_id Qwen/Qwen2-VL-7B-Instruct \
+    --data_path /path/to/train.json \
+    --image_folder /path/to/images \
+    --eval_path /path/to/eval.json \
+    --eval_strategy steps \
+    --eval_steps 500 \
+    --per_device_eval_batch_size 1 \
+    --generation_max_new_tokens 256 \
+    --prediction_loss_only False \
+    # ... other arguments
+```
+
+<details>
+<summary>Evaluation Arguments</summary>
+
+- `--eval_path` (str): Path to the evaluation data JSON file.
+- `--eval_strategy` (str): Evaluation strategy - "steps" or "epoch" (default: "no").
+- `--eval_steps` (int): Number of steps between evaluations (when eval_strategy="steps").
+- `--per_device_eval_batch_size` (int): Batch size for evaluation (default: 8).
+- `--generation_max_new_tokens` (int): Maximum new tokens to generate during evaluation (default: 512).
+- `--prediction_loss_only` (bool): Set to False to enable generation-based evaluation (default: True).
+
+</details>
+
+<details>
+<summary>Example: Custom Metrics with Multiple Scores</summary>
+
+```python
+from src.trainer import GenerativeEvalPrediction
+import re
+
+def compute_metrics(eval_pred: GenerativeEvalPrediction):
+    predictions = eval_pred.predictions
+    references = eval_pred.references
+
+    # Exact match
+    exact_matches = sum(
+        1 for p, r in zip(predictions, references)
+        if p.strip().lower() == r.strip().lower()
+    )
+
+    # Contains match (reference appears in prediction)
+    contains_matches = sum(
+        1 for p, r in zip(predictions, references)
+        if r.strip().lower() in p.strip().lower()
+    )
+
+    n = len(predictions)
+    return {
+        "exact_match": exact_matches / n if n > 0 else 0,
+        "contains_match": contains_matches / n if n > 0 else 0,
+    }
+```
+
+</details>
+
+**Note:** Generation-based evaluation is slower than loss-only evaluation because it runs `model.generate()` for each sample. Consider using a smaller evaluation dataset or less frequent evaluation steps.
 
 ## DPO Finetuning
 

@@ -151,6 +151,12 @@ class TrainingArguments(HFTrainingArguments):
     num_lora_modules: int = -1
     use_liger_kernel: bool = True
 
+    # Generation-based evaluation settings
+    generation_max_new_tokens: int = field(
+        default=512,
+        metadata={"help": "Maximum number of new tokens to generate during evaluation."}
+    )
+
 @dataclass
 class DPOArguments(DPOConfigTRL):
     cache_dir: Optional[str] = field(default=None)
