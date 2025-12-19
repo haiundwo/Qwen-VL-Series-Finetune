@@ -56,6 +56,10 @@ and [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-4B-Thinking) with only using
       - [Image Resolution for vram usage](#image-resolution-for-vram-usage)
       - [Merge LoRA Weights](#merge-lora-weights)
     - [Evaluation during Training](#evaluation-during-training)
+      - [Step 1: Prepare Evaluation Dataset](#step-1-prepare-evaluation-dataset)
+      - [Step 2: Define compute\_metrics Function](#step-2-define-compute_metrics-function)
+      - [Step 3: Modify Training Script](#step-3-modify-training-script)
+      - [Step 4: Add Evaluation Arguments](#step-4-add-evaluation-arguments)
   - [DPO Finetuning](#dpo-finetuning)
   - [GRPO Finetuning](#grpo-finetuning)
     - [Prerequisites](#prerequisites)
@@ -441,6 +445,7 @@ The evaluation dataset uses the same format as the training dataset. Place your 
 #### Step 2: Define compute_metrics Function
 
 Create a custom `compute_metrics` function in your training script. The function receives a `GenerativeEvalPrediction` object containing:
+
 - `predictions`: List of generated text strings from the model
 - `references`: List of ground truth answer strings
 
@@ -490,17 +495,13 @@ trainer = QwenSFTTrainer(
 Add these arguments to your training script:
 
 ```bash
-python -m src.train.train_sft \
-    --model_id Qwen/Qwen2-VL-7B-Instruct \
-    --data_path /path/to/train.json \
-    --image_folder /path/to/images \
-    --eval_path /path/to/eval.json \
-    --eval_strategy steps \
-    --eval_steps 500 \
-    --per_device_eval_batch_size 1 \
-    --generation_max_new_tokens 256 \
-    --prediction_loss_only False \
-    # ... other arguments
+  --eval_path /path/to/eval.json \
+  --eval_strategy steps \
+  --eval_steps 500 \
+  --per_device_eval_batch_size 1 \
+  --generation_max_new_tokens 256 \
+  --prediction_loss_only False \
+  # ... other arguments
 ```
 
 <details>
