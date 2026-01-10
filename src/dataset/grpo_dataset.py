@@ -133,10 +133,14 @@ class GRPODataset(Dataset):
         data_dict = dict(
             prompt=user_prompt,
             assistant=assistant_prompt,
-            images=images,
-            videos=videos,
-            video_kwargs=video_kwargs if is_video else None,
         )
+
+        # Only include images/videos keys when they have actual data
+        if images is not None:
+            data_dict["images"] = images
+        if videos is not None:
+            data_dict["videos"] = videos
+            data_dict["video_kwargs"] = video_kwargs
 
         return data_dict
     

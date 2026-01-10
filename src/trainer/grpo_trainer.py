@@ -99,10 +99,12 @@ class QwenGRPOTrainer(GRPOTrainer):
                         datas, metas = zip(*sample_videos)
                         batched_video_datas.append(list(datas))
                         batched_video_metadatas.append(list(metas))
-                processor_kwargs["videos"] = batched_video_datas
-                processor_kwargs["video_metadata"] = batched_video_metadatas
-                if video_kwargs and video_kwargs[0] is not None:
-                    processor_kwargs.update(video_kwargs[0])
+                # Only add videos to processor_kwargs if there are actual videos (not all None)
+                if not all(v is None for v in batched_video_datas):
+                    processor_kwargs["videos"] = batched_video_datas
+                    processor_kwargs["video_metadata"] = batched_video_metadatas
+                    if video_kwargs and video_kwargs[0] is not None:
+                        processor_kwargs.update(video_kwargs[0])
             else:
                 processor_kwargs["videos"] = videos
 
@@ -273,12 +275,14 @@ class QwenGRPOTrainer(GRPOTrainer):
                             batched_video_datas.append(list(datas))
                             batched_video_metadatas.append(list(metas))
 
-                    processor_kwargs["videos"] = batched_video_datas
-                    processor_kwargs["video_metadata"] = batched_video_metadatas
-                    
-                    common_vk = video_kwargs[0] if isinstance(video_kwargs, list) else video_kwargs
-                    if common_vk is not None:
-                        processor_kwargs.update(common_vk)
+                    # Only add videos to processor_kwargs if there are actual videos (not all None)
+                    if not all(v is None for v in batched_video_datas):
+                        processor_kwargs["videos"] = batched_video_datas
+                        processor_kwargs["video_metadata"] = batched_video_metadatas
+
+                        common_vk = video_kwargs[0] if isinstance(video_kwargs, list) else video_kwargs
+                        if common_vk is not None:
+                            processor_kwargs.update(common_vk)
 
                 else:
                     processor_kwargs["videos"] = videos
