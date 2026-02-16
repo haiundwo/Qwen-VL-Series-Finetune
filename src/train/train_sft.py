@@ -85,6 +85,17 @@ def unfreeze_topk_layers(model, k_llm: int = 0, k_vis: int = 0):
             for p in blk.parameters():
                 p.requires_grad = True
 
+def unfreeze_botk_layers(model, k_llm: int = 0, k_vis: int = 0):
+    if k_llm and hasattr(model, "language_model") and hasattr(model.language_model, "layers"):
+        for layer in model.language_model.layers[:k_llm]:
+            for p in layer.parameters():
+                p.requires_grad = True
+
+    if k_vis and hasattr(model, "visual") and hasattr(model.visual, "blocks"):
+        for blk in model.visual.blocks[:k_vis]:
+            for p in blk.parameters():
+                p.requires_grad = True
+
 
 def train():
     global local_rank
@@ -183,6 +194,12 @@ def train():
         model_to_configure,
         k_llm=getattr(training_args, "unfreeze_topk_llm", 0),
         k_vis=getattr(training_args, "unfreeze_topk_vision", 0),
+    )
+
+    unfreeze_botk_layers(
+        model_to_configure,
+        k_llm=getattr(training_args, "unfreeze_botk_llm", 0),
+        k_vis=getattr(training_args, "unfreeze_botk_vision", 0),
     )
 
     if training_args.gradient_checkpointing:
