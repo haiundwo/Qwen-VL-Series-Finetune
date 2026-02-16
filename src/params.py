@@ -37,6 +37,8 @@ class CLSArguments(HFTrainingArguments):
     unfreeze_topk_vision: int = 0
     unfreeze_botk_llm: int = 0
     unfreeze_botk_vision: int = 0
+    unfreeze_midk_llm: int = 0
+    unfreeze_midk_vision: int = 0
     mlp_head_dim: Optional[int] = field(default=0)
     mlp_head_dropout: Optional[float] = field(default=0.0)
     
@@ -120,6 +122,8 @@ class TrainingArguments(HFTrainingArguments):
     unfreeze_topk_vision: int = 0
     unfreeze_botk_llm: int = 0
     unfreeze_botk_vision: int = 0
+    unfreeze_midk_llm: int = 0
+    unfreeze_midk_vision: int = 0
 
     max_seq_length: int = field(
         default=32768, # This is the default value of the qwen2-vl model

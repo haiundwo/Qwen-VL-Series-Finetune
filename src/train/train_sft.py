@@ -96,6 +96,36 @@ def unfreeze_botk_layers(model, k_llm: int = 0, k_vis: int = 0):
             for p in blk.parameters():
                 p.requires_grad = True
 
+def unfreeze_midk_layers(model, k_llm: int = 0, k_vis: int = 0, *, center: int | None = None) -> None:
+    if k_llm and hasattr(model, "language_model") and hasattr(model.language_model, "layers"):
+        layers = model.language_model.layers
+        n = len(layers)
+        k = max(0, min(int(k_llm), n))
+        if k > 0:
+            c = (n // 2 - 1) if center is None else int(center)
+            c = max(0, min(c, n - 1))
+            start = c - (k // 2)
+            start = max(0, min(start, n - k))
+            end = start + k
+            for layer in layers[start:end]:
+                for p in layer.parameters():
+                    p.requires_grad = True
+
+    if k_vis and hasattr(model, "visual") and hasattr(model.visual, "blocks"):
+        blocks = model.visual.blocks
+        n = len(blocks)
+        k = max(0, min(int(k_vis), n))
+        if k > 0:
+            c = (n // 2) if center is None else int(center)
+            c = max(0, min(c, n - 1))
+            start = c - (k // 2)
+            start = max(0, min(start, n - k))
+            end = start + k
+            for blk in blocks[start:end]:
+                for p in blk.parameters():
+                    p.requires_grad = True
+
+
 
 def train():
     global local_rank
@@ -200,6 +230,12 @@ def train():
         model_to_configure,
         k_llm=getattr(training_args, "unfreeze_botk_llm", 0),
         k_vis=getattr(training_args, "unfreeze_botk_vision", 0),
+    )
+
+    unfreeze_midk_layers(
+        model_to_configure,
+        k_llm=getattr(training_args, "unfreeze_midk_llm", 0),
+        k_vis=getattr(training_args, "unfreeze_midk_vision", 0),
     )
 
     if training_args.gradient_checkpointing:
