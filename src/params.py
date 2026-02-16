@@ -35,6 +35,8 @@ class CLSArguments(HFTrainingArguments):
     disable_flash_attn2: bool = field(default=False)
     unfreeze_topk_llm: int = 0
     unfreeze_topk_vision: int = 0
+    unfreeze_botk_llm: int = 0
+    unfreeze_botk_vision: int = 0
     mlp_head_dim: Optional[int] = field(default=0)
     mlp_head_dropout: Optional[float] = field(default=0.0)
     
