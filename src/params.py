@@ -118,6 +118,8 @@ class TrainingArguments(HFTrainingArguments):
     disable_flash_attn2: bool = field(default=False)
     unfreeze_topk_llm: int = 0
     unfreeze_topk_vision: int = 0
+    unfreeze_botk_llm: int = 0
+    unfreeze_botk_vision: int = 0
 
     max_seq_length: int = field(
         default=32768, # This is the default value of the qwen2-vl model
